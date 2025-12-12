@@ -1,6 +1,7 @@
 // Service API pour communiquer avec le backend local
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-
+const API_URL = import.meta.env.MODE === 'production' 
+  ? '/api'  // URL relative en production (même serveur)
+  : 'http://localhost:3001/api';  // Localhost en développement
 // Stockage du token
 let authToken: string | null = localStorage.getItem('crm_token');
 

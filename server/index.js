@@ -589,7 +589,11 @@ app.get('/api/stats', authenticateToken, (req, res) => {
 // SERVIR LE FRONTEND EN PRODUCTION
 // ============================================
 if (process.env.NODE_ENV === 'production') {
+  // Servir les fichiers statiques du build Vite
   app.use(express.static(join(__dirname, '../client/dist')));
+  
+  // Route catch-all : renvoie index.html pour toutes les routes non-API
+  // Ceci permet au routing React de fonctionner
   app.get('*', (req, res) => {
     res.sendFile(join(__dirname, '../client/dist/index.html'));
   });
@@ -598,8 +602,9 @@ if (process.env.NODE_ENV === 'production') {
 // ============================================
 // DÉMARRAGE DU SERVEUR
 // ============================================
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT}`);
   console.log(`📊 API disponible sur http://localhost:${PORT}/api`);
   console.log(`👤 Admin par défaut: username=admin, password=Admin123!`);
+  console.log(`🌍 Environnement: ${process.env.NODE_ENV || 'development'}`);
 });
