@@ -50,7 +50,7 @@ export function Auth({ onAuthSuccess }: AuthProps) {
         <CardHeader>
           <div className="flex items-center justify-center space-x-3 mb-4">
             <img 
-              src="LogoEthan.png" 
+              src="LogoEthan2.png" 
               alt="Seven Energy Logo" 
               className="h-12 w-auto"
             />

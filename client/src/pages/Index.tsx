@@ -154,7 +154,7 @@ const Index = () => {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <img 
-                src="LogoEthan.png" 
+                src="LogoEthan2.png" 
                 alt="Seven Energy Logo" 
                 className="h-10 w-auto mr-3"
               />
