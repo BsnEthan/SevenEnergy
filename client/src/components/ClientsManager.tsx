@@ -8,8 +8,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2, Building2, Calendar, Phone, Mail, User } from 'lucide-react';
+import { Plus, Pencil, Trash2, Building2, Calendar, Phone, Mail, User, Search, Clock } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { format, parseISO } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 interface Client {
   id: string;
@@ -45,6 +47,10 @@ export function ClientsManager() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deleteClientId, setDeleteClientId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // États pour la recherche
+  const [searchNom, setSearchNom] = useState('');
+  const [searchStatut, setSearchStatut] = useState('tous');
 
   const [formData, setFormData] = useState({
     nom: '',
@@ -84,6 +90,17 @@ export function ClientsManager() {
       setLoading(false);
     }
   };
+
+  // Filtrage des clients
+  const filteredClients = clients.filter(client => {
+    const matchesNom = (client.entreprise || client.nom || '').toLowerCase().includes(searchNom.toLowerCase()) ||
+                       (client.nom_contact || '').toLowerCase().includes(searchNom.toLowerCase()) ||
+                       (client.prenom_contact || '').toLowerCase().includes(searchNom.toLowerCase());
+    
+    const matchesStatut = searchStatut === 'tous' || client.statut_rdv === searchStatut;
+    
+    return matchesNom && matchesStatut;
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,6 +159,18 @@ export function ClientsManager() {
 
   const handleEdit = (client: Client) => {
     setEditingClient(client);
+    
+    // Formater la date pour l'input datetime-local (YYYY-MM-DDTHH:mm)
+    let formattedDate = '';
+    if (client.date_rdv) {
+      try {
+        const date = parseISO(client.date_rdv);
+        formattedDate = format(date, "yyyy-MM-dd'T'HH:mm");
+      } catch (e) {
+        formattedDate = client.date_rdv;
+      }
+    }
+
     setFormData({
       nom: client.entreprise || '',
       adresse: client.adresse || '',
@@ -154,7 +183,7 @@ export function ClientsManager() {
       nom_contact: client.nom_contact || client.nom || '',
       telephone_contact: client.telephone_contact || client.telephone || '',
       email_contact: client.email_contact || client.email || '',
-      date_rdv: client.date_rdv || '',
+      date_rdv: formattedDate,
       type_rdv: client.type_rdv || '',
       statut_rdv: client.statut_rdv || 'en_attente',
       notes_rdv: client.notes_rdv || '',
@@ -226,6 +255,16 @@ export function ClientsManager() {
       case 'valide': return 'Validé';
       case 'annule': return 'Annulé';
       default: return statut;
+    }
+  };
+
+  const formatDateHeure = (dateStr?: string) => {
+    if (!dateStr) return 'Non planifié';
+    try {
+      const date = parseISO(dateStr);
+      return format(date, "d MMMM yyyy 'à' HH:mm", { locale: fr });
+    } catch (e) {
+      return 'Non planifié';
     }
   };
 
@@ -378,7 +417,7 @@ export function ClientsManager() {
                 <h3 className="font-semibold mb-4">Rendez-vous</h3>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="date_rdv">Date du rendez-vous</Label>
+                    <Label htmlFor="date_rdv">Date et heure du rendez-vous</Label>
                     <Input
                       id="date_rdv"
                       type="datetime-local"
@@ -470,16 +509,51 @@ export function ClientsManager() {
         </Dialog>
       </div>
 
+      {/* Barre de recherche */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Rechercher par nom d'entreprise ou contact..."
+                  value={searchNom}
+                  onChange={(e) => setSearchNom(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className="w-64">
+              <Select value={searchStatut} onValueChange={setSearchStatut}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrer par statut" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tous">Tous les statuts</SelectItem>
+                  <SelectItem value="en_attente">En attente</SelectItem>
+                  <SelectItem value="planifie">Planifié</SelectItem>
+                  <SelectItem value="confirme">Confirmé</SelectItem>
+                  <SelectItem value="en_attente_documents">En attente de documents</SelectItem>
+                  <SelectItem value="valide">Validé</SelectItem>
+                  <SelectItem value="annule">Annulé</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Liste des clients en cartes */}
       <div className="space-y-4">
-        {clients.length === 0 ? (
+        {filteredClients.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-muted-foreground">
-              Aucun client enregistré
+              {clients.length === 0 ? 'Aucun client enregistré' : 'Aucun client ne correspond à votre recherche'}
             </CardContent>
           </Card>
         ) : (
-          clients.map((client) => (
+          filteredClients.map((client) => (
             <Card key={client.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
@@ -510,12 +584,12 @@ export function ClientsManager() {
                         <div>
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span>RDV: {client.date_rdv ? new Date(client.date_rdv).toLocaleDateString('fr-FR') : 'Non planifié'}</span>
+                            <span className="truncate">{formatDateHeure(client.date_rdv)}</span>
                           </div>
                           {client.type_rdv && (
                             <div className="ml-6 mt-1">
                               <span className="text-xs font-medium text-gray-700">
-                                {client.type_rdv === 'visio' ? 'Visio' : 'Présentiel'}
+                                {client.type_rdv === 'visio' ? '📹 Visio' : '🏢 Présentiel'}
                               </span>
                             </div>
                           )}

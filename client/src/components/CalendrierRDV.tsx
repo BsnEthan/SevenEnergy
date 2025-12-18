@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { ChevronLeft, ChevronRight, Calendar, MapPin, Lock } from 'lucide-react';
-import { startOfWeek, endOfWeek, addWeeks, format, isSameDay, parseISO, addDays } from 'date-fns';
+import { startOfWeek, endOfWeek, addWeeks, format, isSameDay, parseISO, addDays, getHours, getMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 interface RendezVous {
@@ -30,6 +30,11 @@ export function CalendrierRDV() {
   const [loading, setLoading] = useState(true);
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const { toast } = useToast();
+
+  // Heures de 8h à 20h
+  const START_HOUR = 8;
+  const END_HOUR = 20;
+  const HOUR_HEIGHT = 80; // Hauteur en pixels pour chaque heure
 
   useEffect(() => {
     fetchRdvs();
@@ -65,10 +70,24 @@ export function CalendrierRDV() {
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
   const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
+  const hours = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => i + START_HOUR);
 
   const getRdvsForDay = (day: Date) => {
     return rdvs.filter(rdv => isSameDay(parseISO(rdv.date_heure), day))
       .sort((a, b) => new Date(a.date_heure).getTime() - new Date(b.date_heure).getTime());
+  };
+
+  // Calcule la position verticale du RDV en fonction de son heure
+  const getTopPosition = (dateStr: string) => {
+    const date = parseISO(dateStr);
+    const hour = getHours(date);
+    const minutes = getMinutes(date);
+    
+    // Position relative à 8h (START_HOUR)
+    const hoursFromStart = hour - START_HOUR;
+    const minutesFraction = minutes / 60;
+    
+    return (hoursFromStart + minutesFraction) * HOUR_HEIGHT;
   };
 
   const getStatutBadgeColor = (statut: string) => {
@@ -103,6 +122,8 @@ export function CalendrierRDV() {
     );
   }
 
+  const totalHeight = (END_HOUR - START_HOUR + 1) * HOUR_HEIGHT;
+
   return (
     <div className="space-y-4 h-full">
       {/* Header avec navigation */}
@@ -128,122 +149,177 @@ export function CalendrierRDV() {
         </div>
       </div>
 
-      {/* Grille du calendrier */}
-      <div className="grid grid-cols-7 gap-3 h-[calc(100vh-240px)]">
-        {weekDays.map((day, index) => {
-          const dayRdvs = getRdvsForDay(day);
-          const isToday = isSameDay(day, new Date());
-
-          return (
-            <div
-              key={index}
-              className={`border rounded-lg overflow-hidden flex flex-col ${
-                isToday ? 'border-slate-400 border-2 bg-slate-50' : 'border-gray-200'
-              }`}
-            >
-              {/* En-tête du jour */}
-              <div className={`p-2 text-center border-b ${isToday ? 'bg-slate-800 text-white' : 'bg-gray-100'}`}>
-                <div className="text-xs font-medium uppercase">
-                  {format(day, 'EEE', { locale: fr })}
+      {/* Conteneur avec scroll */}
+      <div className="overflow-hidden border rounded-lg bg-white" style={{ height: 'calc(100vh - 240px)' }}>
+        <div className="flex h-full">
+          {/* Colonne des horaires - fixe */}
+          <div className="w-16 flex-shrink-0 border-r bg-gray-50 overflow-hidden">
+            {/* Header vide pour aligner avec les jours */}
+            <div className="h-16 border-b"></div>
+            
+            {/* Grille des horaires */}
+            <div className="relative" style={{ height: totalHeight }}>
+              {hours.map((hour, index) => (
+                <div 
+                  key={hour} 
+                  className="absolute w-full text-right pr-2 text-sm text-gray-500 font-medium"
+                  style={{ 
+                    top: `${index * HOUR_HEIGHT}px`,
+                    height: `${HOUR_HEIGHT}px`,
+                    lineHeight: '20px'
+                  }}
+                >
+                  {hour}:00
                 </div>
-                <div className={`text-lg font-bold ${isToday ? 'text-white' : 'text-gray-900'}`}>
-                  {format(day, 'd')}
-                </div>
-              </div>
+              ))}
+            </div>
+          </div>
 
-              {/* Liste des RDV du jour */}
-              <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                {dayRdvs.length === 0 ? (
-                  <div className="text-center text-xs text-gray-400 py-4">
-                    Aucun RDV
-                  </div>
-                ) : (
-                  dayRdvs.map((rdv) => (
-                    <Card 
-                      key={rdv.id} 
-                      className={`cursor-pointer hover:shadow-md transition-shadow ${
-                        rdv.is_mine ? 'border-l-4 border-l-slate-600' : 'border-l-4 border-l-gray-300'
+          {/* Zone scrollable pour les jours */}
+          <div className="flex-1 overflow-auto">
+            <div className="flex">
+              {/* En-têtes des jours */}
+              <div className="sticky top-0 z-10 flex bg-white border-b" style={{ minWidth: '100%' }}>
+                {weekDays.map((day, index) => {
+                  const isToday = isSameDay(day, new Date());
+                  return (
+                    <div
+                      key={index}
+                      className={`flex-1 p-2 text-center border-r last:border-r-0 ${
+                        isToday ? 'bg-slate-800 text-white' : 'bg-gray-100'
                       }`}
+                      style={{ minHeight: '64px' }}
                     >
-                      <CardContent className="p-3">
-                        {rdv.is_mine ? (
-                          /* RDV complet - Télépro ou Admin */
-                          <div className="space-y-2">
-                            <div className="flex items-start gap-2">
-                              <Calendar className="h-4 w-4 text-gray-600 mt-0.5 flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold truncate">
-                                  {rdv.entreprise || rdv.titre}
-                                </p>
-                                <p className="text-xs text-gray-600">
-                                  {format(parseISO(rdv.date_heure), 'HH:mm')}
-                                </p>
-                              </div>
-                            </div>
-
-                            {rdv.client_prenom && rdv.client_nom && (
-                              <p className="text-xs text-gray-600 truncate">
-                                👤 {rdv.client_prenom} {rdv.client_nom}
-                              </p>
-                            )}
-
-                            {rdv.telephone && (
-                              <p className="text-xs text-gray-600 truncate">
-                                📞 {rdv.telephone}
-                              </p>
-                            )}
-
-                            {rdv.email && (
-                              <p className="text-xs text-gray-600 truncate">
-                                ✉️ {rdv.email}
-                              </p>
-                            )}
-
-                            {rdv.created_by_username && (
-                              <p className="text-xs text-gray-600 truncate">
-                                Géré par: {rdv.created_by_username}
-                              </p>
-                            )}
-
-                            <div className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${getStatutBadgeColor(rdv.statut)}`}>
-                              {getStatutLabel(rdv.statut)}
-                            </div>
-                          </div>
-                        ) : (
-                          /* Créneau masqué - Télépro qui voit un RDV d'un autre */
-                          <div className="space-y-2">
-                            <div className="flex items-start gap-2">
-                              <Lock className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                              <div className="flex-1">
-                                <p className="text-sm font-semibold text-gray-500">
-                                  Créneau occupé
-                                </p>
-                                <p className="text-xs text-gray-400">
-                                  {format(parseISO(rdv.date_heure), 'HH:mm')}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                              <MapPin className="h-3 w-3" />
-                              <span className="truncate">
-                                {rdv.ville || '—'} {rdv.code_postal ? `(${rdv.code_postal})` : ''}
-                              </span>
-                            </div>
-
-                            <div className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-600 border border-gray-300">
-                              Réservé
-                            </div>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
+                      <div className="text-xs font-medium uppercase">
+                        {format(day, 'EEE', { locale: fr })}
+                      </div>
+                      <div className={`text-lg font-bold ${isToday ? 'text-white' : 'text-gray-900'}`}>
+                        {format(day, 'd')}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          );
-        })}
+
+            {/* Grille des jours avec RDV positionnés */}
+            <div className="flex relative" style={{ height: totalHeight }}>
+              {/* Lignes horizontales pour les heures */}
+              {hours.map((hour, index) => (
+                <div 
+                  key={`line-${hour}`}
+                  className="absolute w-full border-t border-gray-200"
+                  style={{ top: `${index * HOUR_HEIGHT}px` }}
+                />
+              ))}
+
+              {/* Colonnes des jours */}
+              {weekDays.map((day, dayIndex) => {
+                const dayRdvs = getRdvsForDay(day);
+                const isToday = isSameDay(day, new Date());
+
+                return (
+                  <div
+                    key={dayIndex}
+                    className={`flex-1 relative border-r last:border-r-0 ${
+                      isToday ? 'bg-slate-50' : ''
+                    }`}
+                    style={{ minHeight: totalHeight }}
+                  >
+                    {/* RDV positionnés selon leur heure */}
+                    {dayRdvs.map((rdv) => {
+                      const topPosition = getTopPosition(rdv.date_heure);
+                      
+                      return (
+                        <div
+                          key={rdv.id}
+                          className="absolute left-1 right-1"
+                          style={{ 
+                            top: `${topPosition}px`,
+                            minHeight: '70px'
+                          }}
+                        >
+                          <Card 
+                            className={`cursor-pointer hover:shadow-md transition-shadow ${
+                              rdv.is_mine ? 'border-l-4 border-l-slate-600' : 'border-l-4 border-l-gray-300'
+                            }`}
+                          >
+                            <CardContent className="p-2">
+                              {rdv.is_mine ? (
+                                /* RDV complet */
+                                <div className="space-y-1">
+                                  <div className="flex items-start gap-1">
+                                    <Calendar className="h-3 w-3 text-gray-600 mt-0.5 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-semibold truncate">
+                                        {rdv.entreprise || rdv.titre}
+                                      </p>
+                                      <p className="text-xs text-gray-600 font-medium">
+                                        {format(parseISO(rdv.date_heure), 'HH:mm')}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {rdv.client_prenom && rdv.client_nom && (
+                                    <p className="text-xs text-gray-600 truncate">
+                                      👤 {rdv.client_prenom} {rdv.client_nom}
+                                    </p>
+                                  )}
+
+                                  {rdv.telephone && (
+                                    <p className="text-xs text-gray-600 truncate">
+                                      📞 {rdv.telephone}
+                                    </p>
+                                  )}
+
+                                  {rdv.created_by_username && (
+                                    <p className="text-xs text-blue-600 truncate">
+                                      Géré par: {rdv.created_by_username}
+                                    </p>
+                                  )}
+
+                                  <div className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium border ${getStatutBadgeColor(rdv.statut)}`}>
+                                    {getStatutLabel(rdv.statut)}
+                                  </div>
+                                </div>
+                              ) : (
+                                /* Créneau masqué */
+                                <div className="space-y-1">
+                                  <div className="flex items-start gap-1">
+                                    <Lock className="h-3 w-3 text-gray-400 mt-0.5 flex-shrink-0" />
+                                    <div className="flex-1">
+                                      <p className="text-xs font-semibold text-gray-500">
+                                        Créneau occupé
+                                      </p>
+                                      <p className="text-xs text-gray-400 font-medium">
+                                        {format(parseISO(rdv.date_heure), 'HH:mm')}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                                    <MapPin className="h-3 w-3" />
+                                    <span className="truncate">
+                                      {rdv.ville || '—'} {rdv.code_postal ? `(${rdv.code_postal})` : ''}
+                                    </span>
+                                  </div>
+
+                                  <div className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-600 border border-gray-300">
+                                    Réservé
+                                  </div>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
