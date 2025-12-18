@@ -24,8 +24,8 @@ const pool = new Pool({
 });
 
 // Forcer le timezone Europe/Paris pour corriger le décalage horaire
-pool.on('connect', (client) => {
-  client.query('SET timezone TO \'Europe/Paris\'');
+pool.on('connect', async (client) => {
+  await client.query("SET timezone = 'Europe/Paris'");
 });
 
 // Test de connexion
