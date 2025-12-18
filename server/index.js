@@ -23,6 +23,11 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
+// Forcer le timezone Europe/Paris pour corriger le décalage horaire
+pool.on('connect', (client) => {
+  client.query('SET timezone TO \'Europe/Paris\'');
+});
+
 // Test de connexion
 pool.connect((err, client, release) => {
   if (err) {
