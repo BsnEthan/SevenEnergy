@@ -157,6 +157,18 @@ const initDatabase = async () => {
 
     console.log('✅ Tables créées avec succès');
 
+    // Convertir les colonnes TIMESTAMP en TIMESTAMPTZ
+    try {
+      await pool.query(`
+        ALTER TABLE clients ALTER COLUMN date_rdv TYPE TIMESTAMPTZ USING date_rdv AT TIME ZONE 'UTC';
+      `);
+      await pool.query(`
+        ALTER TABLE rendez_vous ALTER COLUMN date_heure TYPE TIMESTAMPTZ USING date_heure AT TIME ZONE 'UTC';
+      `);
+      console.log('✅ Colonnes timezone converties');
+    } catch (error) {
+      console.log('ℹ️  Colonnes déjà converties ou erreur:', error.message);
+    }
     // Créer admin par défaut
     const adminCheck = await pool.query('SELECT id FROM users WHERE username = $1', ['admin']);
     if (adminCheck.rows.length === 0) {
